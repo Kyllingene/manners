@@ -210,22 +210,6 @@ fn render_type(cr: &Crate, ty: &Type, mut depth: usize, page: &mut Vec<Inline>) 
                 page.push(roman(" "));
             }
 
-            if let Some(abi) = match &func.header.abi {
-                Abi::Rust => None,
-                Abi::C { .. } => Some("\"C\""),
-                Abi::Cdecl { .. } => Some("\"cdecl\""),
-                Abi::Stdcall { .. } => Some("\"stdcall\""),
-                Abi::Fastcall { .. } => Some("\"fastcall\""),
-                Abi::Aapcs { .. } => Some("\"aapcs\""),
-                Abi::Win64 { .. } => Some("\"win64\""),
-                Abi::SysV64 { .. } => Some("\"sysv64\""),
-                Abi::System { .. } => Some("\"system\""),
-                Abi::Other(s) => Some(&**s),
-            } {
-                page.push(roman(abi));
-                page.push(roman(" "));
-            }
-
             let Header {
                 const_,
                 unsafe_,
@@ -240,6 +224,22 @@ fn render_type(cr: &Crate, ty: &Type, mut depth: usize, page: &mut Vec<Inline>) 
             }
             if *async_ {
                 page.push(roman("async "));
+            }
+
+            if let Some(abi) = match &func.header.abi {
+                Abi::Rust => None,
+                Abi::C { .. } => Some("\"C\""),
+                Abi::Cdecl { .. } => Some("\"cdecl\""),
+                Abi::Stdcall { .. } => Some("\"stdcall\""),
+                Abi::Fastcall { .. } => Some("\"fastcall\""),
+                Abi::Aapcs { .. } => Some("\"aapcs\""),
+                Abi::Win64 { .. } => Some("\"win64\""),
+                Abi::SysV64 { .. } => Some("\"sysv64\""),
+                Abi::System { .. } => Some("\"system\""),
+                Abi::Other(s) => Some(&**s),
+            } {
+                page.push(roman(abi));
+                page.push(roman(" "));
             }
 
             let inputs = &func.decl.inputs;
@@ -389,22 +389,6 @@ fn render_fn(cr: &Crate, id: &Id, mut depth: usize, page: &mut Vec<Inline>) {
         unreachable!()
     };
 
-    if let Some(abi) = match &func.header.abi {
-        Abi::Rust => None,
-        Abi::C { .. } => Some("\"C\""),
-        Abi::Cdecl { .. } => Some("\"cdecl\""),
-        Abi::Stdcall { .. } => Some("\"stdcall\""),
-        Abi::Fastcall { .. } => Some("\"fastcall\""),
-        Abi::Aapcs { .. } => Some("\"aapcs\""),
-        Abi::Win64 { .. } => Some("\"win64\""),
-        Abi::SysV64 { .. } => Some("\"sysv64\""),
-        Abi::System { .. } => Some("\"system\""),
-        Abi::Other(s) => Some(&**s),
-    } {
-        page.push(roman(abi));
-        page.push(roman(" "));
-    }
-
     let Header {
         const_,
         unsafe_,
@@ -419,6 +403,22 @@ fn render_fn(cr: &Crate, id: &Id, mut depth: usize, page: &mut Vec<Inline>) {
     }
     if *async_ {
         page.push(roman("async "));
+    }
+
+    if let Some(abi) = match &func.header.abi {
+        Abi::Rust => None,
+        Abi::C { .. } => Some("\"C\""),
+        Abi::Cdecl { .. } => Some("\"cdecl\""),
+        Abi::Stdcall { .. } => Some("\"stdcall\""),
+        Abi::Fastcall { .. } => Some("\"fastcall\""),
+        Abi::Aapcs { .. } => Some("\"aapcs\""),
+        Abi::Win64 { .. } => Some("\"win64\""),
+        Abi::SysV64 { .. } => Some("\"sysv64\""),
+        Abi::System { .. } => Some("\"system\""),
+        Abi::Other(s) => Some(&**s),
+    } {
+        page.push(roman(abi));
+        page.push(roman(" "));
     }
 
     let inputs = &func.decl.inputs;
