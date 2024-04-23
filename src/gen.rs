@@ -132,7 +132,6 @@ fn render_fields(cr: &Crate, kind: &StructKind, page: &mut Vec<Inline>) {
                 if !first {
                     sep(page);
                 }
-                first = false;
 
                 let Item {
                     name: Some(name),
@@ -145,10 +144,17 @@ fn render_fields(cr: &Crate, kind: &StructKind, page: &mut Vec<Inline>) {
                 };
 
                 if let Some(docs) = docs {
-                    page.push(line_break());
+                    if !first {
+                        page.push(line_break());
+                        page.push(roman("    "));
+                    } else {
+                        page.push(roman("  "));
+                    }
+                    page.append(&mut markdown::to_roff(docs, 2));
                     page.push(roman("  "));
-                    page.append(&mut markdown::to_roff(docs, 1));
                 }
+
+                first = false;
 
                 page.push(roman(name));
                 page.push(roman(": "));
@@ -478,6 +484,7 @@ fn render_fn(cr: &Crate, id: &Id, mut depth: usize, page: &mut Vec<Inline>) {
     }
 
     page.push(line_break());
+    page.push(roman("  ".repeat(depth)));
     render_where(cr, &func.generics.where_predicates, depth + 1, page);
 }
 
