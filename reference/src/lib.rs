@@ -78,13 +78,23 @@ union Z {
 }
 
 /// Q docs
+#[repr(u32)]
 pub enum Q {
     /// Q::A docs
     A,
     /// Q::B docs
-    B(u8, f32),
+    B(u8, f32) = 3,
     /// Q::C docs
-    C { d: u8, e: f32 },
+    C {
+        /// Docs for:
+        ///
+        /// Q::C.d
+        d: u8,
+        /// Docs for:
+        ///
+        /// Q::C.e
+        e: f32
+    } = 12,
 }
 
 /// G docs

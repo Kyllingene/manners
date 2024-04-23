@@ -1,6 +1,7 @@
 use roff::{bold, italic, line_break, roman, Inline, Roff};
 use rustdoc_types::{
-    Abi, Crate, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Type,
+    Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Type, Variant,
+    VariantKind,
 };
 
 use crate::markdown;
@@ -77,18 +78,17 @@ fn render_fields(cr: &Crate, kind: &StructKind, page: &mut Vec<Inline>) {
 
             let mut first = true;
             let mut private = false;
-            let mut non_private = false;
             for field in fields {
                 if !first {
                     sep(page);
                 }
-                first = false;
 
                 let Some(field) = field else {
-                    // page.push(roman("<private>"));
                     private = true;
                     continue;
                 };
+
+                first = false;
 
                 let Item {
                     inner: ItemEnum::StructField(typ),
@@ -99,11 +99,10 @@ fn render_fields(cr: &Crate, kind: &StructKind, page: &mut Vec<Inline>) {
                 };
 
                 render_type(cr, typ, depth, page);
-                non_private = true;
             }
 
             if private {
-                if non_private {
+                if !first {
                     sep(page);
                 }
                 page.push(roman("/* private fields */"));
@@ -223,9 +222,7 @@ fn render_type(cr: &Crate, ty: &Type, mut depth: usize, page: &mut Vec<Inline>) 
                 Abi::System { .. } => Some("\"system\""),
                 Abi::Other(s) => Some(&**s),
             } {
-                page.push(roman('"'));
                 page.push(roman(abi));
-                page.push(roman("\" "));
             }
 
             let Header {
@@ -503,7 +500,12 @@ fn render_impls(cr: &Crate, impls: &[Id], page: &mut Roff) {
                 page.control("SH", ["IMPLS"]);
                 first = false;
             } else {
-                buf.extend_from_slice(&[line_break(), bold("|=========|"), line_break()]);
+                buf.extend_from_slice(&[
+                    line_break(),
+                    bold("|=========|"),
+                    line_break(),
+                    line_break(),
+                ]);
             }
 
             render_impl(cr, imp, true, &mut buf);
@@ -526,7 +528,12 @@ fn render_impls(cr: &Crate, impls: &[Id], page: &mut Roff) {
                 page.control("SH", ["BLANKET IMPLS"]);
                 first = false;
             } else {
-                buf.extend_from_slice(&[line_break(), bold("|=========|"), line_break()]);
+                buf.extend_from_slice(&[
+                    line_break(),
+                    bold("|=========|"),
+                    line_break(),
+                    line_break(),
+                ]);
             }
 
             render_impl(cr, imp, false, &mut buf);
@@ -549,7 +556,12 @@ fn render_impls(cr: &Crate, impls: &[Id], page: &mut Roff) {
                 page.control("SH", ["AUTO TRAIT IMPLS"]);
                 first = false;
             } else {
-                buf.extend_from_slice(&[line_break(), bold("|=========|"), line_break()]);
+                buf.extend_from_slice(&[
+                    line_break(),
+                    bold("|=========|"),
+                    line_break(),
+                    line_break(),
+                ]);
             }
 
             render_impl(cr, imp, false, &mut buf);
@@ -664,6 +676,215 @@ fn render_impl(cr: &Crate, imp: &Impl, render_items: bool, page: &mut Vec<Inline
     page.push(line_break());
 }
 
+fn render_variant(cr: &Crate, variant: &Variant, page: &mut Vec<Inline>) {
+    match &variant.kind {
+        VariantKind::Plain => {}
+        VariantKind::Tuple(fields) => {
+            page.push(roman("("));
+            let mut depth = 3;
+            let sep = if fields.len() < 3 {
+                |page: &mut Vec<Inline>| page.push(roman(", "))
+            } else {
+                page.push(line_break());
+                page.push(roman("    "));
+                depth += 1;
+
+                |page: &mut Vec<Inline>| {
+                    page.push(roman(","));
+                    page.push(line_break());
+                    page.push(roman("    "));
+                }
+            };
+
+            let mut first = true;
+            for item in fields {
+                if !first {
+                    sep(page);
+                }
+                first = false;
+
+                let Some(id) = item else {
+                    page.push(roman("/* hidden */"));
+                    continue;
+                };
+
+                let Item {
+                    inner: ItemEnum::StructField(ty),
+                    ..
+                } = get(cr, id)
+                else {
+                    panic!("invalid variant type");
+                };
+
+                render_type(cr, ty, depth, page);
+            }
+
+            if fields.len() < 3 {
+                page.push(roman(")"));
+            } else {
+                page.push(line_break());
+                page.push(roman("  )"));
+            }
+        }
+        VariantKind::Struct {
+            fields,
+            fields_stripped,
+        } => {
+            page.push(roman(" {"));
+            page.push(line_break());
+            page.push(roman("    "));
+
+            let sep = |page: &mut Vec<Inline>| {
+                page.push(roman(","));
+                page.push(line_break());
+                page.push(roman("    "));
+            };
+
+            let mut first = true;
+            for id in fields {
+                if !first {
+                    sep(page);
+                }
+
+                let Item {
+                    name,
+                    docs,
+                    inner: ItemEnum::StructField(ty),
+                    ..
+                } = get(cr, id)
+                else {
+                    panic!("invalid variant type");
+                };
+
+                if let Some(docs) = docs {
+                    if !first {
+                        page.push(line_break());
+                        page.push(roman("      "));
+                    } else {
+                        page.push(roman("  "));
+                    }
+                    page.append(&mut markdown::to_roff(docs, 3));
+                    page.push(roman("    "));
+                }
+
+                first = false;
+
+                page.push(roman(name.as_ref().unwrap()));
+                page.push(roman(": "));
+                render_type(cr, ty, 4, page);
+            }
+
+            if *fields_stripped {
+                if !first {
+                    sep(page);
+                }
+                page.push(roman("/* hidden fields */"));
+            }
+
+            page.push(line_break());
+            page.push(roman("  }"));
+        }
+    }
+
+    if let Some(disc) = &variant.discriminant {
+        page.push(roman(" = "));
+        page.push(roman(&*disc.expr));
+    }
+}
+
+fn render_variants(cr: &Crate, variants: &[Id], stripped: bool, page: &mut Vec<Inline>) {
+    page.push(roman(" {"));
+    page.push(line_break());
+    page.push(roman("  "));
+
+    let sep = |page: &mut Vec<Inline>| {
+        page.extend_from_slice(&[roman(","), line_break(), line_break(), roman("  ")])
+    };
+
+    let mut first = true;
+    for id in variants {
+        let item = get(cr, id);
+        let Item {
+            name,
+            docs,
+            inner: ItemEnum::Variant(var),
+            ..
+        } = item
+        else {
+            panic!("invalid variant")
+        };
+
+        if !first {
+            sep(page);
+        }
+        first = false;
+
+        if let Some(docs) = docs {
+            page.push(roman("  "));
+            page.append(&mut markdown::to_roff(docs, 2));
+            page.push(roman("  "));
+        }
+
+        page.push(italic("variant "));
+        page.push(bold(name.as_ref().unwrap()));
+        render_variant(cr, var, page);
+    }
+
+    if stripped {
+        if !first {
+            sep(page);
+        }
+        page.push(roman("/* hidden variants */"));
+    }
+
+    page.push(line_break());
+    page.push(roman("}"));
+}
+
+fn r#enum(cr: &Crate, id: &Id, page: &mut Roff) {
+    let en = get(cr, id);
+    let ItemEnum::Enum(Enum {
+        generics,
+        variants_stripped,
+        variants,
+        impls,
+    }) = &en.inner
+    else {
+        panic!("expected struct")
+    };
+
+    let name = en.name.as_ref().unwrap();
+    page.control("SH", ["SIGNATURE"]);
+
+    let mut buf = Vec::new();
+
+    for attr in &en.attrs {
+        if attr.starts_with("#[repr") {
+            buf.push(roman(attr));
+            buf.push(line_break());
+        }
+    }
+
+    render_generics(cr, name, &generics.params, 0, &mut buf);
+    render_where(cr, &generics.where_predicates, 0, &mut buf);
+    render_variants(cr, variants, *variants_stripped, &mut buf);
+    page.text(&buf[..]);
+
+    if let Some(docs) = &en.docs {
+        if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+            page.control("SH", ["SYNOPSIS"]);
+            page.text(markdown::to_roff(synopsis, 0));
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(rest, 0));
+        } else {
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(docs, 0));
+        }
+    }
+
+    render_impls(cr, impls, page);
+}
+
 fn module(cr: &Crate, id: &Id, max_width: usize, page: &mut Roff) {
     let module = get(cr, id);
     let ItemEnum::Module(Module { items, .. }) = &module.inner else {
@@ -704,6 +925,14 @@ fn strukt(cr: &Crate, id: &Id, page: &mut Roff) {
     page.control("SH", ["SIGNATURE"]);
 
     let mut buf = Vec::new();
+    
+    for attr in &strukt.attrs {
+        if attr.starts_with("#[repr") {
+            buf.push(roman(attr));
+            buf.push(line_break());
+        }
+    }
+
     render_generics(cr, name, &generics.params, 0, &mut buf);
     render_where(cr, &generics.where_predicates, 0, &mut buf);
     render_fields(cr, kind, &mut buf);
@@ -779,6 +1008,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
     match &item.inner {
         ItemEnum::Module(_) => module(cr, id, max_width, &mut page),
         ItemEnum::Struct(_) => strukt(cr, id, &mut page),
+        ItemEnum::Enum(_) => r#enum(cr, id, &mut page),
         ItemEnum::Function(_) => function(cr, id, &mut page),
         ItemEnum::Macro(_) => {
             page.control("SH", ["NAME"]);
