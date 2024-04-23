@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"reference":[["impl Freeze for <a class=\"struct\" href=\"reference/struct.T.html\" title=\"struct reference::T\">T</a>",1,["reference::T"]],["impl Freeze for <a class=\"enum\" href=\"reference/enum.Q.html\" title=\"enum reference::Q\">Q</a>",1,["reference::Q"]],["impl&lt;'a, 'b, F, ABC, DEF, GHI, JKL&gt; Freeze for <a class=\"struct\" href=\"reference/struct.G.html\" title=\"struct reference::G\">G</a>&lt;'a, 'b, F, ABC, DEF, GHI, JKL&gt;<div class=\"where\">where\n    DEF: Freeze,\n    GHI: Freeze,\n    JKL: Freeze,</div>",1,["reference::G"]]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

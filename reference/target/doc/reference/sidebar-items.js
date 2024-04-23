@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CONSTANT"],"enum":["Q"],"fn":["root_fn"],"macro":["decl_macro"],"mod":["module"],"static":["STATIC"],"struct":["G","T"],"type":["TypeAlias"]};
