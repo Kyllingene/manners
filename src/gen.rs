@@ -223,6 +223,7 @@ fn render_type(cr: &Crate, ty: &Type, mut depth: usize, page: &mut Vec<Inline>) 
                 Abi::Other(s) => Some(&**s),
             } {
                 page.push(roman(abi));
+                page.push(roman(" "));
             }
 
             let Header {
@@ -400,9 +401,8 @@ fn render_fn(cr: &Crate, id: &Id, mut depth: usize, page: &mut Vec<Inline>) {
         Abi::System { .. } => Some("\"system\""),
         Abi::Other(s) => Some(&**s),
     } {
-        page.push(roman('"'));
         page.push(roman(abi));
-        page.push(roman("\" "));
+        page.push(roman(" "));
     }
 
     let Header {
