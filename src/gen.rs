@@ -1,7 +1,7 @@
 use roff::{bold, italic, line_break, roman, Inline, Roff};
 use rustdoc_types::{
-    Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Trait, Type,
-    Union, Variant, VariantKind, MacroKind,
+    Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, MacroKind, Module, Struct, StructKind,
+    Trait, Type, Union, Variant, VariantKind,
 };
 
 use crate::markdown;
@@ -957,7 +957,6 @@ fn trate(cr: &Crate, id: &Id, page: &mut Roff) {
     render_generics_bounds(cr, bounds, 0, &mut buf);
     render_where(cr, &generics.where_predicates, 0, &mut buf);
     page.text(&buf[..]);
-    render_items(cr, items, page, None);
 
     page.control("SH", ["OBJECT SAFETY"]);
     if *is_object_safe {
@@ -977,6 +976,8 @@ fn trate(cr: &Crate, id: &Id, page: &mut Roff) {
             page.text(markdown::to_roff(docs, 0));
         }
     }
+
+    render_items(cr, items, page, None);
 
     if !implementations.is_empty() {
         page.control("SH", ["IMPLEMENTORS"]);
@@ -1168,7 +1169,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
         return None;
     }
 
-    let mut path = cr
+    let path = cr
         .paths
         .get(id)
         .map(|i| i.path.join("::"))
@@ -1177,8 +1178,24 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
             item.name.clone().unwrap()
         });
 
+    let typ = match &item.inner {
+        ItemEnum::Module(_) => "mod",
+        ItemEnum::Function(_) => "fn",
+        ItemEnum::Struct(_) => "struct",
+        ItemEnum::Enum(_) => "enum",
+        ItemEnum::Union(_) => "union",
+        ItemEnum::Trait(_) => "trait",
+        ItemEnum::TypeAlias(_) => "type",
+        ItemEnum::Constant(_) => "const",
+        ItemEnum::Static(_) => "static",
+        ItemEnum::Primitive(_) => "primitive",
+        ItemEnum::Macro(_) | ItemEnum::ProcMacro(_) => "macro",
+        _ => panic!("failed to catch {item:#?}"),
+    };
+    let full_name = format!("{typ}:{path}");
+
     let mut page = Roff::new();
-    page.control("TH", [&path, "3r"]);
+    page.control("TH", [&full_name, "3r"]);
 
     if let Some(dep) = &item.deprecation {
         page.control("SH", ["DEPRECATED"]);
@@ -1190,26 +1207,21 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
         }
     }
 
-    let prefix = match &item.inner {
+    match &item.inner {
         ItemEnum::Module(_) => {
             module(cr, id, max_width, &mut page);
-            "mod"
         }
         ItemEnum::Union(_) => {
             onion(cr, id, &mut page);
-            "union"
         }
         ItemEnum::Struct(_) => {
             strukt(cr, id, &mut page);
-            "struct"
         }
         ItemEnum::Enum(_) => {
             r#enum(cr, id, &mut page);
-            "enum"
         }
         ItemEnum::Function(_) => {
             function(cr, id, &mut page);
-            "fn"
         }
         ItemEnum::Macro(_) => {
             page.control("SH", ["NAME"]);
@@ -1226,12 +1238,9 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
-
-            "macro"
         }
         ItemEnum::Trait(_) => {
             trate(cr, id, &mut page);
-            "trait"
         }
         ItemEnum::Primitive(pr) => {
             page.control("SH", ["NAME"]);
@@ -1250,14 +1259,18 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
             }
 
             render_impls(cr, &pr.impls, &mut page);
-
-            "primitive"
         }
         ItemEnum::TypeAlias(alias) => {
             page.control("SH", ["SIGNATURE"]);
 
             let mut buf = vec![roman("type ")];
-            render_generics(cr, item.name.as_ref().unwrap(), &alias.generics.params, 0, &mut buf);
+            render_generics(
+                cr,
+                item.name.as_ref().unwrap(),
+                &alias.generics.params,
+                0,
+                &mut buf,
+            );
             buf.push(roman(" = "));
             render_type(cr, &alias.type_, 0, &mut buf);
 
@@ -1279,13 +1292,15 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
-
-            "type"
         }
         ItemEnum::Constant(co) => {
             page.control("SH", ["SIGNATURE"]);
 
-            let mut buf = vec![roman("const "), bold(item.name.as_ref().unwrap()), roman(": ")];
+            let mut buf = vec![
+                roman("const "),
+                bold(item.name.as_ref().unwrap()),
+                roman(": "),
+            ];
             render_type(cr, &co.type_, 0, &mut buf);
             page.text(buf);
 
@@ -1300,17 +1315,19 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
-
-            "const"
         }
         ItemEnum::Static(st) => {
             page.control("SH", ["SIGNATURE"]);
 
-            let mut buf = vec![if st.mutable {
-                roman("static mut ")
-            } else {
-                roman("static ")
-            }, bold(item.name.as_ref().unwrap()), roman(": ")];
+            let mut buf = vec![
+                if st.mutable {
+                    roman("static mut ")
+                } else {
+                    roman("static ")
+                },
+                bold(item.name.as_ref().unwrap()),
+                roman(": "),
+            ];
             render_type(cr, &st.type_, 0, &mut buf);
             page.text(buf);
 
@@ -1325,8 +1342,6 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
-
-            "static"
         }
         ItemEnum::ProcMacro(mac) => {
             page.control("SH", ["SIGNATURE"]);
@@ -1355,8 +1370,6 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
-
-            "macro"
         }
 
         _ => panic!("failed to catch {item:#?}"),
@@ -1364,9 +1377,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
 
     render_links(cr, item, &mut page);
 
-    path.insert(0, '.');
-    path.insert_str(0, prefix);
-    Some((path, page))
+    Some((full_name, page))
 }
 
 fn floor_char_boundary(s: &str, index: usize) -> usize {
