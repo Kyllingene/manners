@@ -1231,6 +1231,75 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
 
             render_impls(cr, &pr.impls, &mut page);
         }
+        ItemEnum::TypeAlias(alias) => {
+            page.control("SH", ["SIGNATURE"]);
+
+            let mut buf = vec![roman("type ")];
+            render_generics(cr, item.name.as_ref().unwrap(), &alias.generics.params, 0, &mut buf);
+            buf.push(roman(" = "));
+            render_type(cr, &alias.type_, 0, &mut buf);
+
+            if !alias.generics.where_predicates.is_empty() {
+                buf.push(line_break());
+                render_where(cr, &alias.generics.where_predicates, 0, &mut buf);
+            }
+
+            page.text(buf);
+
+            if let Some(docs) = &item.docs {
+                if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+                    page.control("SH", ["SYNOPSIS"]);
+                    page.text(markdown::to_roff(synopsis, 0));
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(rest, 0));
+                } else {
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(docs, 0));
+                }
+            }
+        }
+        ItemEnum::Constant(co) => {
+            page.control("SH", ["SIGNATURE"]);
+
+            let mut buf = vec![roman("const "), bold(item.name.as_ref().unwrap()), roman(": ")];
+            render_type(cr, &co.type_, 0, &mut buf);
+            page.text(buf);
+
+            if let Some(docs) = &item.docs {
+                if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+                    page.control("SH", ["SYNOPSIS"]);
+                    page.text(markdown::to_roff(synopsis, 0));
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(rest, 0));
+                } else {
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(docs, 0));
+                }
+            }
+        }
+        ItemEnum::Static(st) => {
+            page.control("SH", ["SIGNATURE"]);
+
+            let mut buf = vec![if st.mutable {
+                roman("static mut ")
+            } else {
+                roman("static ")
+            }, bold(item.name.as_ref().unwrap()), roman(": ")];
+            render_type(cr, &st.type_, 0, &mut buf);
+            page.text(buf);
+
+            if let Some(docs) = &item.docs {
+                if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+                    page.control("SH", ["SYNOPSIS"]);
+                    page.text(markdown::to_roff(synopsis, 0));
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(rest, 0));
+                } else {
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(docs, 0));
+                }
+            }
+        }
 
         _ => return None,
     }
