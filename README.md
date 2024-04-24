@@ -28,9 +28,9 @@ manpages are compressed using gzip.
 
 ### Documenting `std`
 
-If you attempt to document `std`, `core`, or `alloc` from source, you'll run
-into unresolvable errors. Instead, run the following command to download the
-JSON manifests for nightly:
+If you attempt to document the standard library from source, you'll run into
+unresolvable errors. Instead, run the following command to download the JSON
+manifests for nightly:
 
 ```shell
 $ rustup component add rust-docs-json --toolchain nightly
