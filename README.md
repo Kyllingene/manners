@@ -6,8 +6,7 @@ experimental
 feature to output documentation similar to what you would normally recieve from
 `rustdoc`, but in manpage form.
 
-[![asciinema
-showcase](https://asciinema.org/a/pqSFmkfFf4B3PNdQzyUySomc2.png)](https://asciinema.org/a/pqSFmkfFf4B3PNdQzyUySomc2)
+[![asciinema showcase](https://asciinema.org/a/656065.png)](https://asciinema.org/a/656065)
 
 ## Usage
 
