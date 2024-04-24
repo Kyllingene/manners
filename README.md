@@ -8,7 +8,7 @@ feature to output documentation similar to what you would normally recieve from
 
 ## Showcase
 
-[![asciinema showcase](https://asciinema.org/a/656065.png)](https://asciinema.org/a/656065)
+[![asciicast](https://asciinema.org/a/656065.svg)](https://asciinema.org/a/656065)
 
 ## Usage
 
