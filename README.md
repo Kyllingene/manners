@@ -4,7 +4,7 @@ Manners is a CLI utility that generates manpages for Rust libraries. It uses the
 experimental
 [`rustdoc-json`](https://rust-lang.github.io/rfcs/2963-rustdoc-json.html)
 feature to output documentation similar to what you would normally recieve from
-rustdoc, but in manpage form.
+`rustdoc`, but in manpage form.
 
 ## Usage
 
@@ -16,8 +16,12 @@ indirect dependencies, so it shouldn't take too long.
 ### Running
 
 Usage is simple. Run `manners` with a list of paths to the `Cargo.toml`s of each
-crate to generate documentation for. Alternatively, pass `-j` and a list of
+crate to generate documentation for. Alternatively, pass `-j/--json` and a list of
 paths to premade JSON manifests.
+
+By default, all features are enabled. If you'd like to change this, pass
+`-f/--features` with a list of features to enable: if any are passed, default
+features are automatically disabled.
 
 ### Output
 
@@ -51,6 +55,19 @@ Rust documentation is also much more comprehensive than the normal manpage,
 consisting of far more syntax and far less prose than is typical. This cannot be
 worked around, but any suggestions for improving the style or searchability of
 the pages would be welcome.
+
+In addition, extra long documentation lines will soft-wrap, ignoring
+indentation. This is fixable, but has not been fixed yet.
+
+External items (e.g. `extern crate`) are not yet implemented.
+
+## Stability
+
+The output of these manpages is subject to change, just as the HTML output of
+`rustdoc` is. Moreover, there are no guarantees this will continue to work: the
+output of `rustdoc-json` could also change at any time, or even be removed
+entirely, or the interface for generating the JSON could change. In any event,
+issues/PRs addressing breakages would be appreciated.
 
 ## Contributing
 

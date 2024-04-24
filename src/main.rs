@@ -54,7 +54,7 @@ fn main() {
         fs::remove_dir_all(output).fail("failed to clean output directory");
     }
 
-    for file in files {
+    for file in &files[1..] {
         let docs_path = if !args.json {
             let mut data_dir = dirs::data_dir().unwrap_or_else(|| "./".into());
             data_dir.push("manners");

@@ -37,6 +37,10 @@ pub mod module {
         fn foobar() {}
     }
 }
+use module::F;
+
+/// Documentation of a public re-export.
+pub use module::F as F2;
 
 /// T docs
 pub struct T {

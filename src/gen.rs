@@ -919,6 +919,52 @@ fn module(cr: &Crate, id: &Id, max_width: usize, page: &mut Roff) {
     }
 
     render_items(cr, items, page, Some(max_width));
+
+    let mut first = true;
+    for id in items {
+        let Item { docs, inner: ItemEnum::Import(import), .. } = get(cr, id) else { continue };
+
+        if first {
+            page.control("SH", ["RE-EXPORTS"]);
+            first = false;
+        }
+
+        page.text([
+            roman("pub use "),
+            italic(&import.source),
+        ]);
+
+        let mut width = "pub use ".len() + import.source.len();
+        if !import.source.ends_with(&import.name) {
+            page.text([roman("as "), bold(&import.name)]);
+            width += 4 + import.name.len();
+        }
+
+        if let Some(docs) = docs {
+            let synopsis = docs.split_once("\n\n")
+                .or_else(|| docs.split_once('\n'))
+                .map(|s| s.0)
+                .unwrap_or(docs);
+
+            let remaining = max_width - width;
+
+            let end = floor_char_boundary(synopsis, if synopsis.len() >= remaining {
+                remaining.saturating_sub(3)
+            } else {
+                synopsis.len()
+            });
+
+            page.text([
+                bold("// "),
+                roman(&synopsis[..end]), // TODO: parse this markdown
+                roman(if synopsis.len() >= remaining {
+                    "..."
+                } else {
+                    ""
+                })
+            ]);
+        }
+    }
 }
 
 fn trate(cr: &Crate, id: &Id, page: &mut Roff) {
@@ -1435,7 +1481,7 @@ macro_rules! render_item_kinds {
                 if let Some(docs) = &item.docs {
                     if let Some(max_width) = $max_width {
                         let synopsis = docs.split_once("\n\n")
-                            .or_else(|| docs.split_once("\n"))
+                            .or_else(|| docs.split_once('\n'))
                             .map(|s| s.0)
                             .unwrap_or(docs);
 
