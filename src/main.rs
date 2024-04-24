@@ -1,6 +1,6 @@
 #![allow(clippy::ptr_arg)] // FIXME: why is clippy doing this
 
-use errata::FallibleExt;
+use errata::{FallibleExt, error};
 use flate2::{Compression, GzBuilder};
 use roff::Roff;
 use rustdoc_types::{Crate, Id, Item, ItemEnum, Module};
@@ -15,9 +15,6 @@ mod markdown;
 
 sarge! {
     Args,
-
-    > "The list of files to translate."
-    'f' files: Vec<String>,
 
     > "The maximum width of documentation summary lines."
     'w' max_width: usize = 80,
@@ -41,11 +38,15 @@ sarge! {
 
 #[errata::catch]
 fn main() {
-    let (args, _) = Args::parse().fail("failed to parse arguments");
+    let (args, files) = Args::parse().fail("failed to parse arguments");
 
     if args.help {
         Args::print_help();
         return;
+    }
+
+    if files.is_empty() {
+        error!("expected at least 1 target file");
     }
 
     let output = Path::new(&args.output);
@@ -53,7 +54,7 @@ fn main() {
         fs::remove_dir_all(output).fail("failed to clean output directory");
     }
 
-    for file in args.files {
+    for file in files {
         let docs_path = if !args.json {
             let mut data_dir = dirs::data_dir().unwrap_or_else(|| "./".into());
             data_dir.push("manners");
