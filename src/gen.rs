@@ -1,7 +1,7 @@
 use roff::{bold, italic, line_break, roman, Inline, Roff};
 use rustdoc_types::{
-    Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Type, Variant,
-    VariantKind,
+    Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Trait, Type,
+    Union, Variant, VariantKind,
 };
 
 use crate::markdown;
@@ -35,7 +35,7 @@ fn render_links(cr: &Crate, item: &Item, page: &mut Roff) {
     }
 }
 
-fn render_items(cr: &Crate, items: &[Id], page: &mut Roff, max_width: usize) {
+fn render_items(cr: &Crate, items: &[Id], page: &mut Roff, max_width: Option<usize>) {
     render_item_kinds! {
         cr, items, page, max_width;
         "MODULES": mod Module;
@@ -379,6 +379,10 @@ fn render_type(cr: &Crate, ty: &Type, mut depth: usize, page: &mut Vec<Inline>) 
                     page.push(bold(&tr.name));
                 }
                 page.push(roman(">::"));
+                page.push(italic(name));
+            } else {
+                render_type(cr, self_type, depth, page);
+                page.push(roman("::"));
                 page.push(italic(name));
             }
         }
@@ -914,7 +918,83 @@ fn module(cr: &Crate, id: &Id, max_width: usize, page: &mut Roff) {
         }
     }
 
-    render_items(cr, items, page, max_width);
+    render_items(cr, items, page, Some(max_width));
+}
+
+fn trate(cr: &Crate, id: &Id, page: &mut Roff) {
+    let tr = get(cr, id);
+    let ItemEnum::Trait(Trait {
+        is_auto,
+        is_unsafe,
+        is_object_safe,
+        items,
+        generics,
+        bounds,
+        implementations,
+    }) = &tr.inner
+    else {
+        panic!("expected struct")
+    };
+
+    let name = tr.name.as_ref().unwrap();
+    page.control("SH", ["SIGNATURE"]);
+
+    let mut buf = Vec::new();
+
+    if *is_unsafe {
+        buf.push(roman("unsafe "));
+    }
+
+    if *is_auto {
+        buf.push(roman("auto "));
+    }
+
+    buf.push(roman("trait "));
+    render_generics(cr, name, &generics.params, 0, &mut buf);
+    if !bounds.is_empty() {
+        buf.push(roman(": "));
+    }
+    render_generics_bounds(cr, bounds, 0, &mut buf);
+    render_where(cr, &generics.where_predicates, 0, &mut buf);
+    page.text(&buf[..]);
+    render_items(cr, items, page, None);
+
+    page.control("SH", ["OBJECT SAFETY"]);
+    if *is_object_safe {
+        page.text([roman("This trait is object-safe.")]);
+    } else {
+        page.text([roman("This trait is "), bold("not"), roman(" object-safe.")]);
+    }
+
+    if let Some(docs) = &tr.docs {
+        if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+            page.control("SH", ["SYNOPSIS"]);
+            page.text(markdown::to_roff(synopsis, 0));
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(rest, 0));
+        } else {
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(docs, 0));
+        }
+    }
+
+    if !implementations.is_empty() {
+        page.control("SH", ["IMPLEMENTORS"]);
+
+        for id in implementations {
+            let Item {
+                inner: ItemEnum::Impl(imp),
+                ..
+            } = get(cr, id)
+            else {
+                panic!("invalid impl")
+            };
+
+            let mut buf = Vec::new();
+            render_impl(cr, imp, false, &mut buf);
+            page.text(buf);
+        }
+    }
 }
 
 fn strukt(cr: &Crate, id: &Id, page: &mut Roff) {
@@ -932,7 +1012,7 @@ fn strukt(cr: &Crate, id: &Id, page: &mut Roff) {
     page.control("SH", ["SIGNATURE"]);
 
     let mut buf = Vec::new();
-    
+
     for attr in &strukt.attrs {
         if attr.starts_with("#[repr") {
             buf.push(roman(attr));
@@ -946,6 +1026,104 @@ fn strukt(cr: &Crate, id: &Id, page: &mut Roff) {
     page.text(&buf[..]);
 
     if let Some(docs) = &strukt.docs {
+        if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+            page.control("SH", ["SYNOPSIS"]);
+            page.text(markdown::to_roff(synopsis, 0));
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(rest, 0));
+        } else {
+            page.control("SH", ["DESCRIPTION"]);
+            page.text(markdown::to_roff(docs, 0));
+        }
+    }
+
+    render_impls(cr, impls, page);
+}
+
+fn onion(cr: &Crate, id: &Id, page: &mut Roff) {
+    let onion = get(cr, id);
+    let ItemEnum::Union(Union {
+        generics,
+        fields_stripped,
+        fields,
+        impls,
+    }) = &onion.inner
+    else {
+        panic!("expected struct")
+    };
+
+    let name = onion.name.as_ref().unwrap();
+    page.control("SH", ["SIGNATURE"]);
+
+    let mut buf = Vec::new();
+
+    for attr in &onion.attrs {
+        if attr.starts_with("#[repr") {
+            buf.push(roman(attr));
+            buf.push(line_break());
+        }
+    }
+
+    render_generics(cr, name, &generics.params, 0, &mut buf);
+    render_where(cr, &generics.where_predicates, 0, &mut buf);
+
+    buf.push(roman(" {"));
+    buf.push(line_break());
+    buf.push(roman("    "));
+
+    let sep = |buf: &mut Vec<Inline>| {
+        buf.push(roman(","));
+        buf.push(line_break());
+        buf.push(roman("    "));
+    };
+
+    let mut first = true;
+    for id in fields {
+        if !first {
+            sep(&mut buf);
+        }
+
+        let Item {
+            name,
+            docs,
+            inner: ItemEnum::StructField(ty),
+            ..
+        } = get(cr, id)
+        else {
+            panic!("invalid variant type");
+        };
+
+        if let Some(docs) = docs {
+            if !first {
+                buf.push(line_break());
+                buf.push(roman("      "));
+            } else {
+                buf.push(roman("  "));
+            }
+            buf.append(&mut markdown::to_roff(docs, 3));
+            buf.push(roman("    "));
+        }
+
+        first = false;
+
+        buf.push(roman(name.as_ref().unwrap()));
+        buf.push(roman(": "));
+        render_type(cr, ty, 4, &mut buf);
+    }
+
+    if *fields_stripped {
+        if !first {
+            sep(&mut buf);
+        }
+        buf.push(roman("/* hidden fields */"));
+    }
+
+    buf.push(line_break());
+    buf.push(roman("  }"));
+
+    page.text(&buf[..]);
+
+    if let Some(docs) = &onion.docs {
         if let Some((synopsis, rest)) = docs.split_once("\n\n") {
             page.control("SH", ["SYNOPSIS"]);
             page.text(markdown::to_roff(synopsis, 0));
@@ -1014,6 +1192,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
 
     match &item.inner {
         ItemEnum::Module(_) => module(cr, id, max_width, &mut page),
+        ItemEnum::Union(_) => onion(cr, id, &mut page),
         ItemEnum::Struct(_) => strukt(cr, id, &mut page),
         ItemEnum::Enum(_) => r#enum(cr, id, &mut page),
         ItemEnum::Function(_) => function(cr, id, &mut page),
@@ -1033,6 +1212,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                 }
             }
         }
+        ItemEnum::Trait(_) => trate(cr, id, &mut page),
         ItemEnum::Primitive(pr) => {
             page.control("SH", ["NAME"]);
             page.text([roman("primitive "), bold(&pr.name)]);
@@ -1092,36 +1272,62 @@ macro_rules! render_item_kinds {
                 first = false;
 
                 let path = $cr.paths.get(id)
-                    .unwrap_or_else(|| panic!("invalid ID: {}", id.0)).path.join("::");
-
-                $page.text([
-                    roman(concat!(stringify!($name), " ")),
-                    italic(&path),
-                ]);
-
-                if let Some(docs) = &item.docs {
-                    let synopsis = docs.split_once("\n\n")
-                        .or_else(|| docs.split_once("\n"))
-                        .map(|s| s.0)
-                        .unwrap_or(docs);
-
-                    let width = stringify!($name).len() + path.len() + 5;
-                    let remaining = $max_width - width;
-
-                    let end = floor_char_boundary(synopsis, if synopsis.len() >= remaining {
-                        remaining.saturating_sub(3)
-                    } else {
-                        synopsis.len()
+                    .map(|i| i.path.join("::"))
+                    .unwrap_or_else(|| {
+                        eprintln!(
+                            concat!(
+                                "no path for ",
+                                stringify!($name),
+                                " {}",
+                            ),
+                            item.name.as_ref().unwrap(),
+                        );
+                        item.name.clone().unwrap()
                     });
 
+                if $max_width.is_some() {
                     $page.text([
-                        bold("// "),
-                        roman(&synopsis[..end]),
-                        roman(if synopsis.len() >= remaining {
-                            "..."
+                        roman(concat!(stringify!($name), " ")),
+                        italic(&path),
+                    ]);
+                }
+
+                if let Some(docs) = &item.docs {
+                    if let Some(max_width) = $max_width {
+                        let synopsis = docs.split_once("\n\n")
+                            .or_else(|| docs.split_once("\n"))
+                            .map(|s| s.0)
+                            .unwrap_or(docs);
+
+                        let width = stringify!($name).len() + path.len() + 5;
+                        let remaining = max_width - width;
+
+                        let end = floor_char_boundary(synopsis, if synopsis.len() >= remaining {
+                            remaining.saturating_sub(3)
                         } else {
-                            ""
-                        })
+                            synopsis.len()
+                        });
+
+                        $page.text([
+                            bold("// "),
+                            roman(&synopsis[..end]), // TODO: parse this markdown
+                            roman(if synopsis.len() >= remaining {
+                                "..."
+                            } else {
+                                ""
+                            })
+                        ]);
+                    } else {
+                        let mut buf = markdown::to_roff(docs, 1);
+                        buf.insert(0, roman("  "));
+                        $page.text(buf);
+                    }
+                }
+
+                if $max_width.is_none() {
+                    $page.text([
+                        roman(concat!(stringify!($name), " ")),
+                        italic(&path),
                     ]);
                 }
 
