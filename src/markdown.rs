@@ -69,7 +69,7 @@ fn traverse_nodes(node: &Node, inline: &mut Vec<Inline>, state: &mut State) {
             inline.push(line_break());
 
             for line in code.value.lines() {
-                if line.starts_with("# ") {
+                if line.trim().starts_with("# ") || line.trim() == "#" {
                     continue;
                 }
                 let indent = "  ".repeat(state.indentation + 1);

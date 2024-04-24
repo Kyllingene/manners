@@ -6,7 +6,11 @@
 //! `Some code`
 //!
 //! ```rust
+//! # a hidden line
+//!
 //! some more code
+//! 
+//! # another hidden line
 //! ```
 //!
 //! # Some funny business
