@@ -929,16 +929,20 @@ fn module(cr: &Crate, id: &Id, max_width: usize, page: &mut Roff) {
             first = false;
         }
 
-        page.text([
+        let mut buf = vec![
             roman("pub use "),
             italic(&import.source),
-        ]);
+        ];
 
         let mut width = "pub use ".len() + import.source.len();
+
         if !import.source.ends_with(&import.name) {
-            page.text([roman("as "), bold(&import.name)]);
+            buf.extend_from_slice(&[roman("as "), bold(&import.name)]);
             width += 4 + import.name.len();
+        } else if import.glob {
+            buf.push(roman("::*"));
         }
+        page.text(buf);
 
         if let Some(docs) = docs {
             let synopsis = docs.split_once("\n\n")
@@ -964,6 +968,8 @@ fn module(cr: &Crate, id: &Id, max_width: usize, page: &mut Roff) {
                 })
             ]);
         }
+        
+        page.text([line_break()]);
     }
 }
 

@@ -56,8 +56,13 @@ consisting of far more syntax and far less prose than is typical. This cannot be
 worked around, but any suggestions for improving the style or searchability of
 the pages would be welcome.
 
-In addition, extra long documentation lines will soft-wrap, ignoring
-indentation. This is fixable, but has not been fixed yet.
+Dependencies are not documented, which means crates like `clap` will generate
+unhelpful documentation. This is a limitation with `rustdoc-json` at the moment,
+and cannot yet be resolved; in the meantime, you'll have to manually generate
+documentation for each dependency.
+
+Extra long documentation lines will soft-wrap, ignoring indentation. This is
+fixable, but has not been fixed yet.
 
 External items (e.g. `extern crate`) are not yet implemented.
 
