@@ -1,7 +1,7 @@
 use roff::{bold, italic, line_break, roman, Inline, Roff};
 use rustdoc_types::{
     Abi, Crate, Enum, Header, Id, Impl, Item, ItemEnum, Module, Struct, StructKind, Trait, Type,
-    Union, Variant, VariantKind,
+    Union, Variant, VariantKind, MacroKind,
 };
 
 use crate::markdown;
@@ -1168,7 +1168,7 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
         return None;
     }
 
-    let path = cr
+    let mut path = cr
         .paths
         .get(id)
         .map(|i| i.path.join("::"))
@@ -1190,12 +1190,27 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
         }
     }
 
-    match &item.inner {
-        ItemEnum::Module(_) => module(cr, id, max_width, &mut page),
-        ItemEnum::Union(_) => onion(cr, id, &mut page),
-        ItemEnum::Struct(_) => strukt(cr, id, &mut page),
-        ItemEnum::Enum(_) => r#enum(cr, id, &mut page),
-        ItemEnum::Function(_) => function(cr, id, &mut page),
+    let prefix = match &item.inner {
+        ItemEnum::Module(_) => {
+            module(cr, id, max_width, &mut page);
+            "mod"
+        }
+        ItemEnum::Union(_) => {
+            onion(cr, id, &mut page);
+            "union"
+        }
+        ItemEnum::Struct(_) => {
+            strukt(cr, id, &mut page);
+            "struct"
+        }
+        ItemEnum::Enum(_) => {
+            r#enum(cr, id, &mut page);
+            "enum"
+        }
+        ItemEnum::Function(_) => {
+            function(cr, id, &mut page);
+            "fn"
+        }
         ItemEnum::Macro(_) => {
             page.control("SH", ["NAME"]);
             page.text([roman("macro "), bold(item.name.as_ref().unwrap())]);
@@ -1211,8 +1226,13 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
+
+            "macro"
         }
-        ItemEnum::Trait(_) => trate(cr, id, &mut page),
+        ItemEnum::Trait(_) => {
+            trate(cr, id, &mut page);
+            "trait"
+        }
         ItemEnum::Primitive(pr) => {
             page.control("SH", ["NAME"]);
             page.text([roman("primitive "), bold(&pr.name)]);
@@ -1230,6 +1250,8 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
             }
 
             render_impls(cr, &pr.impls, &mut page);
+
+            "primitive"
         }
         ItemEnum::TypeAlias(alias) => {
             page.control("SH", ["SIGNATURE"]);
@@ -1257,6 +1279,8 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
+
+            "type"
         }
         ItemEnum::Constant(co) => {
             page.control("SH", ["SIGNATURE"]);
@@ -1276,6 +1300,8 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
+
+            "const"
         }
         ItemEnum::Static(st) => {
             page.control("SH", ["SIGNATURE"]);
@@ -1299,13 +1325,47 @@ pub fn gen(cr: &Crate, id: &Id, max_width: usize) -> Option<(String, Roff)> {
                     page.text(markdown::to_roff(docs, 0));
                 }
             }
+
+            "static"
+        }
+        ItemEnum::ProcMacro(mac) => {
+            page.control("SH", ["SIGNATURE"]);
+            let name = item.name.as_ref().unwrap();
+            match mac.kind {
+                MacroKind::Bang => page.text([roman("proc macro "), bold(name)]),
+                MacroKind::Attr => page.text([roman("#["), bold(name), roman("]")]),
+                MacroKind::Derive => page.text([roman("#[derive("), bold(name), roman("]")]),
+            };
+
+            if !mac.helpers.is_empty() {
+                page.control("SH", ["ATTRS"]);
+                for helper in &mac.helpers {
+                    page.text([roman("#["), italic(helper), roman("]")]);
+                }
+            }
+
+            if let Some(docs) = &item.docs {
+                if let Some((synopsis, rest)) = docs.split_once("\n\n") {
+                    page.control("SH", ["SYNOPSIS"]);
+                    page.text(markdown::to_roff(synopsis, 0));
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(rest, 0));
+                } else {
+                    page.control("SH", ["DESCRIPTION"]);
+                    page.text(markdown::to_roff(docs, 0));
+                }
+            }
+
+            "macro"
         }
 
-        _ => return None,
-    }
+        _ => panic!("failed to catch {item:#?}"),
+    };
 
     render_links(cr, item, &mut page);
 
+    path.insert(0, '.');
+    path.insert_str(0, prefix);
     Some((path, page))
 }
 
